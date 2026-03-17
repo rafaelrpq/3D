@@ -1,4 +1,17 @@
-dist/
 node_modules
-~*
+dist
+dist-ssr
+*.local
 
+# Editor directories and files
+.vscode
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+~*
