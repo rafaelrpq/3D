@@ -11,9 +11,9 @@
 <body>
     <div id="hud">
         <div class="hud-item">
-            <span class="hud-label">ENERGY</span>
+            <span class="hud-label">LIFE</span>
             <div class="energy-bar-container">
-                <div id="energy-bar"></div>
+                <div id="health-bar"></div>
             </div>
         </div>
         <div class="hud-item">
@@ -24,6 +24,20 @@
             </div>
         </div>
     </div>
+
+    <div id="overlay">
+        <div id="start-screen" class="screen">
+            <h1>3D SPACE SURVIVAL</h1>
+            <p>Use ARROWS to move, X to jump, S to shoot (hold to charge)</p>
+            <p class="blink">Press ENTER to Start</p>
+        </div>
+        <div id="game-over-screen" class="screen" style="display: none;">
+            <h1 class="danger">GAME OVER</h1>
+            <p>You were defeated by the space cubes.</p>
+            <p class="blink">Press ENTER to Restart</p>
+        </div>
+    </div>
+
     <canvas id="game-canvas"></canvas>
     <script type="module" src="/main.js"></script>
 </body>

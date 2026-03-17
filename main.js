@@ -9,6 +9,8 @@ const PLAYER_SPEED = 0.07;
 const JUMP_FORCE = 0.17;
 const GRAVITY = 0.008;
 
+let gameState = 'START'; // START, PLAYING, GAMEOVER
+
 // --- Visual Helpers ---
 function addEdges(mesh) {
     const edges = new THREE.EdgesGeometry(mesh.geometry);
@@ -311,7 +313,144 @@ scene.add(pointLight);
 const walls = [];
 const obstacles = [];
 const projectiles = [];
+const enemies = [];
+const enemyProjectiles = [];
 const particles = [];
+
+// --- Enemy Class ---
+class Enemy {
+    constructor(pos) {
+        const geo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xff4444 });
+        this.mesh = new THREE.Mesh(geo, mat);
+        this.mesh.position.set(...pos);
+        this.mesh.castShadow = true;
+        scene.add(this.mesh);
+        addEdges(this.mesh, 0xff0000);
+
+        this.health = 5;
+        this.speed = 0.03;
+        this.shootTimer = 0;
+        this.shootInterval = 1.5 + Math.random() * 2; // Shoot every 1.5-3.5 seconds
+        this.alive = true;
+    }
+
+    update(player) {
+        if (!this.alive) return;
+
+        // Move towards player
+        const dir = player.mesh.position.clone().sub(this.mesh.position);
+        dir.y = 0;
+        const dist = dir.length();
+
+        if (dist > 2) { // Stay at a distance
+            dir.normalize();
+            const nextX = this.mesh.position.x + dir.x * this.speed;
+            const nextZ = this.mesh.position.z + dir.z * this.speed;
+            
+            // Basic collision check (reusing player logic simplified)
+            if (!this.checkCollision(nextX, nextZ)) {
+                this.mesh.position.x = nextX;
+                this.mesh.position.z = nextZ;
+            }
+        }
+
+        // Shooting
+        this.shootTimer += 1/60;
+        if (this.shootTimer >= this.shootInterval) {
+            this.shoot(player);
+            this.shootTimer = 0;
+        }
+    }
+
+    checkCollision(x, z) {
+        const enemyBox = new THREE.Box3().setFromCenterAndSize(
+            new THREE.Vector3(x, this.mesh.position.y, z),
+            new THREE.Vector3(0.7, 0.7, 0.7)
+        );
+        
+        // Include other enemies in collision check
+        const otherEnemiesMeshes = enemies.filter(e => e !== this && e.alive).map(e => e.mesh);
+        const collidables = [...walls, ...obstacles, player.mesh, ...otherEnemiesMeshes];
+        
+        for (const obj of collidables) {
+            const box = new THREE.Box3().setFromObject(obj);
+            if (box.intersectsBox(enemyBox)) return true;
+        }
+        return false;
+    }
+
+    shoot(player) {
+        const dir = player.mesh.position.clone().sub(this.mesh.position).normalize();
+        const bullet = new EnemyProjectile(this.mesh.position.clone(), dir);
+        enemyProjectiles.push(bullet);
+    }
+
+    takeDamage(amount) {
+        this.health -= amount;
+        if (this.health <= 0) {
+            this.die();
+        } else {
+            // Flicker red
+            this.mesh.material.emissive.setHex(0xff0000);
+            setTimeout(() => this.mesh.material.emissive.setHex(0x000000), 100);
+        }
+    }
+
+    die() {
+        this.alive = false;
+        createBigExplosion(this.mesh.position.clone());
+        scene.remove(this.mesh);
+    }
+}
+
+// --- Enemy Projectile Class ---
+class EnemyProjectile {
+    constructor(pos, dir) {
+        const geo = new THREE.SphereGeometry(0.15);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+        this.mesh = new THREE.Mesh(geo, mat);
+        this.mesh.position.copy(pos);
+        this.mesh.position.y = 0.5;
+        scene.add(this.mesh);
+
+        this.dir = dir;
+        this.speed = 0.12;
+        this.alive = true;
+    }
+
+    update() {
+        this.mesh.position.addScaledVector(this.dir, this.speed);
+
+        // Player Collision
+        const playerBox = new THREE.Box3().setFromObject(player.mesh);
+        if (playerBox.containsPoint(this.mesh.position)) {
+            player.takeDamage(10);
+            this.destroy();
+            return;
+        }
+
+        // Wall & Obstacle Collision
+        const collidables = [...walls, ...obstacles];
+        for (const obj of collidables) {
+            const box = new THREE.Box3().setFromObject(obj);
+            if (box.containsPoint(this.mesh.position)) {
+                this.destroy();
+                break;
+            }
+        }
+
+        // Room limits
+        if (Math.abs(this.mesh.position.x) > ROOM_SIZE || Math.abs(this.mesh.position.z) > ROOM_SIZE) {
+            this.destroy();
+        }
+    }
+
+    destroy() {
+        this.alive = false;
+        scene.remove(this.mesh);
+    }
+}
 
 // --- Room Creation ---
 function createRoom() {
@@ -360,6 +499,15 @@ function createRoom() {
         obstacles.push(obs);
         addEdges(obs, 0xffaa00);
     });
+
+    // Spawn Enemies
+    const enemyPositions = [
+        [5, 0.35, 5], [-5, 0.35, -5], [5, 0.35, -5], [-5, 0.35, 5]
+    ];
+    enemyPositions.forEach(pos => {
+        const enemy = new Enemy(pos);
+        enemies.push(enemy);
+    });
 }
 createRoom();
 
@@ -384,11 +532,12 @@ class Player {
         this.chargeTime = 0;
         this.chargeLevel = 1;
 
-        // Energy Stats
-        this.maxEnergy = 100;
-        this.currentEnergy = 100;
-        this.hudBar = document.getElementById('energy-bar');
+        // Health Stats
+        this.maxHealth = 100;
+        this.currentHealth = 100;
+        this.hudBar = document.getElementById('health-bar');
         this.standingOn = null;
+        this.invulnerable = 0;
 
         // Add Indicator (Visor/Eyes)
         const indicatorGeo = new THREE.BoxGeometry(0.5, 0.1, 0.1);
@@ -410,13 +559,15 @@ class Player {
         this.chargeSphere.position.set(0, 0.2, 0.4); // Exactly at firing height and in front (+Z)
         this.chargeSphere.visible = false;
         this.mesh.add(this.chargeSphere);
+        this.updateHUD();
     }
 
     update() {
-        // Regenerate energy slowly
-        if (this.currentEnergy < this.maxEnergy) {
-            this.currentEnergy = Math.min(this.maxEnergy, this.currentEnergy + 0.1);
-            this.updateHUD();
+        // Invulnerability flicker
+        if (this.invulnerable > 0) {
+            this.invulnerable -= 1/60;
+            this.mesh.visible = Math.floor(this.invulnerable * 10) % 2 === 0;
+            if (this.invulnerable <= 0) this.mesh.visible = true;
         }
 
         // Movement
@@ -490,7 +641,7 @@ class Player {
         // Shoot
         const shootRequested = keys.KeyS || (gp && gp.shoot);
         
-        if (shootRequested && this.canShoot && this.currentEnergy >= 5) {
+        if (shootRequested && this.canShoot) {
             if (!this.shootKeyWasDown) {
                 this.isCharging = true;
                 this.chargeTime = 0;
@@ -519,14 +670,10 @@ class Player {
             }
         } else if (!shootRequested && this.shootKeyWasDown && this.isCharging) {
             // Release shot
-            const energyCost = 5 * this.chargeLevel;
-            if (this.currentEnergy >= energyCost) {
-                this.shoot(this.chargeLevel);
-                this.currentEnergy -= energyCost;
-                this.updateHUD();
-                this.canShoot = false;
-                setTimeout(() => this.canShoot = true, 300);
-            }
+            this.shoot(this.chargeLevel);
+            this.canShoot = false;
+            setTimeout(() => this.canShoot = true, 300);
+            
             this.isCharging = false;
             this.chargeSphere.visible = false;
             this.chargeSphere.scale.set(1, 1, 1);
@@ -541,14 +688,29 @@ class Player {
     }
 
     updateHUD() {
-        const percent = (this.currentEnergy / this.maxEnergy) * 100;
+        const percent = (this.currentHealth / this.maxHealth) * 100;
         this.hudBar.style.width = `${percent}%`;
 
-        // Color transition based on energy
+        // Color transition based on health
         if (percent < 30) {
             this.hudBar.style.background = 'linear-gradient(90deg, #ff4444, #cc0000)';
         } else {
             this.hudBar.style.background = 'linear-gradient(90deg, #00ff88, #00aa66)';
+        }
+    }
+
+    takeDamage(amount) {
+        if (this.invulnerable > 0 || gameState !== 'PLAYING') return;
+        this.currentHealth -= amount;
+        this.invulnerable = 1.0; // 1 second of invulnerability
+        this.updateHUD();
+        if (this.currentHealth <= 0) {
+            gameState = 'GAMEOVER';
+            document.getElementById('overlay').style.display = 'flex';
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-over-screen').style.display = 'block';
+            SoundManager.stopChargeSound();
+            this.isCharging = false;
         }
     }
 
@@ -669,7 +831,7 @@ class Projectile {
         this.mesh.position.addScaledVector(this.dir, this.speed);
 
         // Wall & Obstacle Collision
-        const collidables = [...walls, ...obstacles];
+        const collidables = [...walls, ...obstacles, ...enemies.map(e => e.mesh)];
         for (const obj of collidables) {
             const box = new THREE.Box3().setFromObject(obj);
             if (box.containsPoint(this.mesh.position)) {
@@ -702,6 +864,10 @@ class Projectile {
                 obj.scale.setScalar(1.1);
                 setTimeout(() => obj.scale.setScalar(1), 50);
             }
+        } else if (enemies.some(e => e.mesh === obj)) {
+            const enemy = enemies.find(e => e.mesh === obj);
+            if (enemy) enemy.takeDamage(this.power);
+            this.explode();
         } else {
             this.explode();
         }
@@ -782,15 +948,29 @@ const raycaster = new THREE.Raycaster();
 function animate() {
     requestAnimationFrame(animate);
 
-    player.update();
+    if (gameState === 'PLAYING') {
+        player.update();
 
-    // Update Projectiles
-    for (let i = projectiles.length - 1; i >= 0; i--) {
-        projectiles[i].update();
-        if (!projectiles[i].alive) projectiles.splice(i, 1);
+        // Update Enemies
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            enemies[i].update(player);
+            if (!enemies[i].alive) enemies.splice(i, 1);
+        }
+
+        // Update Enemy Projectiles
+        for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+            enemyProjectiles[i].update();
+            if (!enemyProjectiles[i].alive) enemyProjectiles.splice(i, 1);
+        }
+
+        // Update Projectiles
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            projectiles[i].update();
+            if (!projectiles[i].alive) projectiles.splice(i, 1);
+        }
     }
 
-    // Update Particles
+    // Update Particles (Always update for visual effect)
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         
@@ -848,6 +1028,47 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     effect.setSize(window.innerWidth, window.innerHeight);
+});
+
+function resetGame() {
+    // Reset Player
+    player.currentHealth = player.maxHealth;
+    player.updateHUD();
+    player.mesh.position.set(0, 0.3, 0);
+    player.velocity.set(0, 0, 0);
+    player.isGrounded = true;
+    player.invulnerable = 0;
+    player.mesh.visible = true;
+
+    // Clear Enemies and Projectiles
+    enemies.forEach(e => scene.remove(e.mesh));
+    enemies.length = 0;
+    enemyProjectiles.forEach(p => scene.remove(p.mesh));
+    enemyProjectiles.length = 0;
+    projectiles.forEach(p => scene.remove(p.mesh));
+    projectiles.length = 0;
+    particles.forEach(p => scene.remove(p));
+    particles.length = 0;
+
+    // Respawn Enemies
+    const enemyPositions = [
+        [5, 0.35, 5], [-5, 0.35, -5], [5, 0.35, -5], [-5, 0.35, 5]
+    ];
+    enemyPositions.forEach(pos => {
+        const enemy = new Enemy(pos);
+        enemies.push(enemy);
+    });
+
+    gameState = 'PLAYING';
+    document.getElementById('overlay').style.display = 'none';
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+        if (gameState === 'START' || gameState === 'GAMEOVER') {
+            resetGame();
+        }
+    }
 });
 
 animate();
