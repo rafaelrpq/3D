@@ -145,6 +145,92 @@ const GamepadHandler = {
     }
 };
 
+// --- Mobile Handler ---
+const MobileHandler = {
+    active: false,
+    move: new THREE.Vector2(0, 0),
+    jump: false,
+    shoot: false,
+    joystickCenter: new THREE.Vector2(0, 0),
+    maxRadius: 40,
+
+    init() {
+        // Detect mobile (touch device)
+        if (!window.matchMedia("(pointer: coarse)").matches) return;
+        
+        this.active = true;
+        document.getElementById('mobile-controls').style.display = 'flex';
+        
+        const stick = document.getElementById('joystick-stick');
+        const zone = document.getElementById('joystick-zone');
+        const base = document.getElementById('joystick-base');
+
+        const updateJoystick = (e) => {
+            const touch = e.touches[0];
+            const rect = base.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > this.maxRadius) {
+                dx = (dx / dist) * this.maxRadius;
+                dy = (dy / dist) * this.maxRadius;
+            }
+            
+            stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            this.move.set(dx / this.maxRadius, dy / this.maxRadius);
+        };
+
+        zone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            updateJoystick(e);
+        });
+
+        zone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            updateJoystick(e);
+        });
+
+        zone.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stick.style.transform = 'translate(-50%, -50%)';
+            this.move.set(0, 0);
+        });
+
+        // Action Buttons
+        const btnJump = document.getElementById('btn-jump');
+        const btnShoot = document.getElementById('btn-shoot');
+        const btnStart = document.getElementById('btn-start');
+
+        btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); this.jump = true; });
+        btnJump.addEventListener('touchend', (e) => { e.preventDefault(); this.jump = false; });
+        
+        btnShoot.addEventListener('touchstart', (e) => { e.preventDefault(); this.shoot = true; });
+        btnShoot.addEventListener('touchend', (e) => { e.preventDefault(); this.shoot = false; });
+
+        btnStart.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'START' || gameState === 'GAMEOVER') {
+                resetGame();
+            }
+        });
+    },
+
+    getInputs() {
+        if (!this.active) return null;
+        return {
+            move: this.move,
+            jump: this.jump,
+            shoot: this.shoot
+        };
+    }
+};
+
+MobileHandler.init();
+
 window.addEventListener("gamepadconnected", (e) => {
     console.log("Gamepad connected at index %d: %s. %d buttons, %d axes.",
         e.gamepad.index, e.gamepad.id,
@@ -333,6 +419,26 @@ class Enemy {
         this.shootTimer = 0;
         this.shootInterval = 1.5 + Math.random() * 2; // Shoot every 1.5-3.5 seconds
         this.alive = true;
+
+        // Health Bar UI
+        this.healthBarGroup = new THREE.Group();
+        this.healthBarGroup.position.y = 0.6; // Above enemy head
+        this.mesh.add(this.healthBarGroup);
+
+        const barBgGeo = new THREE.PlaneGeometry(0.6, 0.1);
+        const barBgMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
+        const barBg = new THREE.Mesh(barBgGeo, barBgMat);
+        this.healthBarGroup.add(barBg);
+
+        const barHealthGeo = new THREE.PlaneGeometry(0.6, 0.1);
+        const barHealthMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        this.barHealth = new THREE.Mesh(barHealthGeo, barHealthMat);
+        // Move to left so it scales from center-left
+        this.barHealth.position.z = 0.01; 
+        this.healthBarGroup.add(this.barHealth);
+        
+        this.healthBarGroup.visible = false; // Hidden until hit
+        this.healthBarTimer = 0;
     }
 
     update(player) {
@@ -361,6 +467,17 @@ class Enemy {
             this.shoot(player);
             this.shootTimer = 0;
         }
+
+        // Face health bar to camera
+        this.healthBarGroup.quaternion.copy(camera.quaternion);
+
+        // Hide health bar after timeout
+        if (this.healthBarTimer > 0) {
+            this.healthBarTimer -= 1/60;
+            if (this.healthBarTimer <= 0) {
+                this.healthBarGroup.visible = false;
+            }
+        }
     }
 
     checkCollision(x, z) {
@@ -387,7 +504,16 @@ class Enemy {
     }
 
     takeDamage(amount) {
+        const maxHealth = 5; // Default max health for enemy
         this.health -= amount;
+        
+        // Show and update health bar
+        this.healthBarGroup.visible = true;
+        this.healthBarTimer = 3.0; // Show for 3 seconds
+        const percent = Math.max(0, this.health / maxHealth);
+        this.barHealth.scale.x = percent;
+        this.barHealth.position.x = -0.3 * (1 - percent); // Keep it anchored to the left
+
         if (this.health <= 0) {
             this.die();
         } else {
@@ -579,10 +705,13 @@ class Player {
 
         // Gamepad Movement
         const gp = GamepadHandler.getInputs();
-        if (gp) {
-            if (Math.abs(gp.move.x) > 0 || Math.abs(gp.move.y) > 0) {
-                moveDir.x = gp.move.x;
-                moveDir.z = gp.move.y;
+        const mobile = MobileHandler.getInputs();
+
+        if (gp || mobile) {
+            const input = gp || mobile;
+            if (Math.abs(input.move.x) > 0 || Math.abs(input.move.y) > 0) {
+                moveDir.x = input.move.x;
+                moveDir.z = input.move.y;
             }
         }
 
@@ -608,7 +737,7 @@ class Player {
         }
 
         // Jump
-        const jumpRequested = keys.KeyX || (gp && gp.jump);
+        const jumpRequested = keys.KeyX || (gp && gp.jump) || (mobile && mobile.jump);
         if (jumpRequested && this.isGrounded && !this.jumpKeyWasDown) {
             this.velocity.y = JUMP_FORCE;
             this.isGrounded = false;
@@ -639,7 +768,7 @@ class Player {
         }
 
         // Shoot
-        const shootRequested = keys.KeyS || (gp && gp.shoot);
+        const shootRequested = keys.KeyS || (gp && gp.shoot) || (mobile && mobile.shoot);
         
         if (shootRequested && this.canShoot) {
             if (!this.shootKeyWasDown) {
