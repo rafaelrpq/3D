@@ -1,0 +1,14 @@
+- crie uma sala em visão top-down.
+- posicione o jogador ao centro.
+- adicione paredes ao redor da sala.
+- torne a parede translucida caso ela esteja entre a camera e o jogador.
+- adicione controles para o jogador usando as setas do teclado para a movimentação, X para pulo e S para disparo.
+- faça a checagem de colisões do jogador com as paredes e outros objetos.
+- faça a checagem de colisões do jogador com a paredes e outros objetos no eixo Y.
+- permita que o jogador se movimente no eixo X e Z quando estiver em cima de outros objetos.
+- remova a translucidez do objeto caso o jogador esteja em cima dele.
+- faça a checagem de colisões dos projéteis com as paredes e outros objetos, removendo-os da memória em caso de colisão.
+- adicione iluminação aos projéteis de forma que iluminem a sala ao se movimentarem.
+- adicione efeito de explosão ao projétil colidir.
+- adicione iluminação a explosão do projétil.
+- adicione efeitos sonoros para os eventos de colisão e explosão.

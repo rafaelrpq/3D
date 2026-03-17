@@ -1,0 +1,133 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #050505;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+#game-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    outline: none;
+}
+
+#hud {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.hud-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hud-label {
+    color: #00ff88;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+.energy-bar-container {
+    width: 200px;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    backdrop-filter: blur(5px);
+}
+
+#energy-bar {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #00ff88, #00aa66);
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+    transition: width 0.3s ease-out;
+}
+
+.premium-button {
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.6);
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+    text-shadow: 0 0 5px rgba(0, 255, 136, 0.5);
+    margin-top: 10px;
+}
+
+.premium-button:hover {
+    background: rgba(0, 255, 136, 0.1);
+    border-color: #00ff88;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+    transform: translateY(-1px);
+}
+
+.premium-button:active {
+    transform: translateY(0);
+}
+
+.premium-button.active {
+    background: #00ff88;
+    color: #000;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+}
+
+.slider-container {
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    margin-top: 5px;
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hud-label.small {
+    font-size: 10px;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #00ff88;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.8);
+}
