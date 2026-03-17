@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Game - Three.js</title>
-  <script type="module" crossorigin src="/3D/assets/index-D7Ls8pZP.js"></script>
-  <link rel="stylesheet" crossorigin href="/3D/assets/index-DR2WMg8v.css">
+  <script type="module" crossorigin src="/3D/assets/index-CaZZjifX.js"></script>
+  <link rel="stylesheet" crossorigin href="/3D/assets/index-BZGriPnw.css">
 </head>
 
 <body>
@@ -17,13 +17,6 @@
                 <div id="health-bar"></div>
             </div>
         </div>
-        <div class="hud-item">
-            <button id="toggle-3d" class="premium-button">3D: OFF</button>
-            <div id="intensity-container" class="slider-container" style="display: none;">
-                <span class="hud-label small">INTENSITY</span>
-                <input type="range" id="anaglyph-intensity" min="0" max="1" step="0.01" value="0.05">
-            </div>
-        </div>
     </div>
 
     <div id="overlay">
@@ -32,10 +25,39 @@
             <p>Use ARROWS to move, X to jump, S to shoot (hold to charge)</p>
             <p class="blink">Press ENTER to Start</p>
         </div>
+        <div id="pause-menu" class="screen" style="display: none;">
+            <h1>PAUSED</h1>
+            <div class="player-info">
+                <p>STATUS: <span id="player-status-text" class="highlight">ACTIVE</span></p>
+                <p>HEALTH: <span id="player-health-text" class="highlight">100/100</span></p>
+            </div>
+            <div class="menu-options">
+                <div class="hud-item center">
+                    <button id="toggle-3d" class="premium-button">3D: OFF</button>
+                    <div id="intensity-container" class="slider-container" style="display: none;">
+                        <span class="hud-label small">INTENSITY</span>
+                        <input type="range" id="anaglyph-intensity" min="0" max="1" step="0.01" value="0.05">
+                    </div>
+                </div>
+                <button id="btn-resume" class="premium-button large-top">RESUME (ENTER)</button>
+            </div>
+        </div>
         <div id="game-over-screen" class="screen" style="display: none;">
             <h1 class="danger">GAME OVER</h1>
             <p>You were defeated by the space cubes.</p>
             <p class="blink">Press ENTER to Restart</p>
+        </div>
+        <div id="victory-screen" class="screen" style="display: none;">
+            <h1>MISSION COMPLETE</h1>
+            <div class="stats-panel">
+                <p>TIME: <span id="stat-time" class="highlight">0:00</span></p>
+                <p>PRECISION: <span id="stat-precision" class="highlight">0%</span></p>
+                <hr>
+                <p>LEVEL 1 SHOTS: <span id="stat-lvl1" class="highlight">0</span></p>
+                <p>LEVEL 2 SHOTS: <span id="stat-lvl2" class="highlight">0</span></p>
+                <p>LEVEL 3 SHOTS: <span id="stat-lvl3" class="highlight">0</span></p>
+            </div>
+            <p class="blink">Press ENTER to Play Again</p>
         </div>
     </div>
 
@@ -49,8 +71,8 @@
             <button id="btn-start" class="mobile-btn-large">START</button>
         </div>
         <div id="mobile-actions">
-            <button id="btn-jump" class="mobile-btn">JUMP</button>
             <button id="btn-shoot" class="mobile-btn">SHOOT</button>
+            <button id="btn-jump" class="mobile-btn">JUMP</button>
         </div>
     </div>
 
