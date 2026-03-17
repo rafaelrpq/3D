@@ -9,7 +9,16 @@ const PLAYER_SPEED = 0.07;
 const JUMP_FORCE = 0.17;
 const GRAVITY = 0.008;
 
-let gameState = 'START'; // START, PLAYING, GAMEOVER
+let gameState = 'START'; // START, PLAYING, PAUSED, GAMEOVER, VICTORY
+
+let stats = {
+    startTime: 0,
+    totalTime: 0,
+    lvl1Shots: 0,
+    lvl2Shots: 0,
+    lvl3Shots: 0,
+    totalHits: 0
+};
 
 // --- Visual Helpers ---
 function addEdges(mesh) {
@@ -213,8 +222,22 @@ const MobileHandler = {
 
         btnStart.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            
+            // Try to enter fullscreen on mobile
+            const doc = window.document;
+            const docEl = doc.documentElement;
+            const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+            
+            if (requestFullScreen) {
+                requestFullScreen.call(docEl).catch(err => {
+                    console.warn(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+            }
+
             if (gameState === 'START' || gameState === 'GAMEOVER') {
                 resetGame();
+            } else {
+                togglePause();
             }
         });
     },
@@ -552,7 +575,7 @@ class EnemyProjectile {
         const playerBox = new THREE.Box3().setFromObject(player.mesh);
         if (playerBox.containsPoint(this.mesh.position)) {
             player.takeDamage(10);
-            this.destroy();
+            this.explode();
             return;
         }
 
@@ -561,7 +584,7 @@ class EnemyProjectile {
         for (const obj of collidables) {
             const box = new THREE.Box3().setFromObject(obj);
             if (box.containsPoint(this.mesh.position)) {
-                this.destroy();
+                this.handleCollision(obj);
                 break;
             }
         }
@@ -570,6 +593,34 @@ class EnemyProjectile {
         if (Math.abs(this.mesh.position.x) > ROOM_SIZE || Math.abs(this.mesh.position.z) > ROOM_SIZE) {
             this.destroy();
         }
+    }
+
+    handleCollision(obj) {
+        if (obj.userData.hits !== undefined) {
+            obj.userData.hits += 1; // Basic power
+            if (obj.userData.hits >= 10) {
+                createBigExplosion(obj.position.clone());
+                scene.remove(obj);
+                // Remove from lists
+                const wallIdx = walls.indexOf(obj);
+                if (wallIdx > -1) walls.splice(wallIdx, 1);
+                const obsIdx = obstacles.indexOf(obj);
+                if (obsIdx > -1) obstacles.splice(obsIdx, 1);
+            } else {
+                this.explode();
+                // Visual feedback for hit
+                obj.scale.setScalar(1.1);
+                setTimeout(() => obj.scale.setScalar(1), 50);
+            }
+        } else {
+            this.explode();
+        }
+    }
+
+    explode() {
+        createExplosion(this.mesh.position.clone());
+        SoundManager.playExplosion();
+        this.destroy();
     }
 
     destroy() {
@@ -897,6 +948,10 @@ class Player {
     }
 
     shoot(power = 1) {
+        if (power === 1) stats.lvl1Shots++;
+        else if (power === 2) stats.lvl2Shots++;
+        else if (power === 3) stats.lvl3Shots++;
+
         const muzzlePos = new THREE.Vector3();
         this.chargeSphere.getWorldPosition(muzzlePos);
         const bullet = new Projectile(muzzlePos, this.direction.clone(), power);
@@ -1190,12 +1245,36 @@ function resetGame() {
 
     gameState = 'PLAYING';
     document.getElementById('overlay').style.display = 'none';
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('pause-menu').style.display = 'none';
+    document.getElementById('game-over-screen').style.display = 'none';
 }
+
+function togglePause() {
+    if (gameState === 'PLAYING') {
+        gameState = 'PAUSED';
+        document.getElementById('overlay').style.display = 'flex';
+        document.getElementById('pause-menu').style.display = 'block';
+        
+        // Update Player Info in Menu
+        document.getElementById('player-health-text').textContent = `${Math.ceil(player.currentHealth)}/${player.maxHealth}`;
+        document.getElementById('player-status-text').textContent = player.invulnerable > 0 ? 'RECOVERING' : 'ACTIVE';
+        
+    } else if (gameState === 'PAUSED') {
+        gameState = 'PLAYING';
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('pause-menu').style.display = 'none';
+    }
+}
+
+document.getElementById('btn-resume').addEventListener('click', togglePause);
 
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Enter') {
         if (gameState === 'START' || gameState === 'GAMEOVER') {
             resetGame();
+        } else {
+            togglePause();
         }
     }
 });
