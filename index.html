@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Game - Three.js</title>
+  <script type="module" crossorigin src="/assets/index-Bzc-uSUY.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index--aUEK2JE.css">
+</head>
+
+<body>
+    <div id="hud">
+        <div class="hud-item">
+            <span class="hud-label">ENERGY</span>
+            <div class="energy-bar-container">
+                <div id="energy-bar"></div>
+            </div>
+        </div>
+        <div class="hud-item">
+            <button id="toggle-3d" class="premium-button">3D: OFF</button>
+            <div id="intensity-container" class="slider-container" style="display: none;">
+                <span class="hud-label small">INTENSITY</span>
+                <input type="range" id="anaglyph-intensity" min="0" max="1" step="0.01" value="0.05">
+            </div>
+        </div>
+    </div>
+    <canvas id="game-canvas"></canvas>
+</body>
+
+</html>
